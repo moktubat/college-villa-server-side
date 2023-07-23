@@ -42,6 +42,7 @@ app.get("/", (req, res) => {
 });
 
 const collegesCollection = client.db("collegeDb").collection("colleges");
+const usersCollection = client.db("collegeDb").collection("users");
 
 
 app.get('/colleges', async(req, res) => {
@@ -49,6 +50,21 @@ app.get('/colleges', async(req, res) => {
     res.send(result);
 })
 
+app.get("/users", async (req, res) => {
+  const result = await usersCollection.find().toArray();
+  res.send(result);
+});
+
+app.post("/users", async (req, res) => {
+  const user = req.body;
+  const query = { email: user.email };
+  const existingUser = await usersCollection.findOne(query);
+  if (existingUser) {
+    return res.send({ message: "user already exists" });
+  }
+  const result = await usersCollection.insertOne(user);
+  res.send(result);
+});
 
 app.listen(port, () => {
   console.log(`Admission on port ${port}`);
