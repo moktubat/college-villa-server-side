@@ -22,18 +22,14 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
-    client.connect();
-    // Send a ping to confirm a successful connection
-    // await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
-  } finally {
-    // Ensures that the client will close when you finish/error
-    // await client.close();
+    // Connect the client to the server (optional starting in v4.7)
+    await client.connect();
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+  } catch (error) {
+    console.error("Error connecting to MongoDB:", error);
   }
 }
+
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
@@ -42,6 +38,8 @@ app.get("/", (req, res) => {
 
 const collegesCollection = client.db("collegeDb").collection("colleges");
 const usersCollection = client.db("collegeDb").collection("users");
+const myCollegeSelection = client.db("collegeDb").collection("myCollege");
+
 
 app.get("/colleges", async (req, res) => {
   const result = await collegesCollection.find().toArray();
@@ -50,10 +48,46 @@ app.get("/colleges", async (req, res) => {
 
 app.get("/collegeInfo/:id", async (req, res) => {
   const id = req.params.id;
-  const query = { _id: new ObjectId(id) };
-  const result = await collegesCollection.findOne(query);
-  res.send(result);
+  try {
+    const college = await collegesCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!college) {
+      return res.status(404).send({ message: "College not found" });
+    }
+
+    res.send(college);
+  } catch (error) {
+    console.error("Error fetching college information:", error);
+    res.status(500).send({ message: "An error occurred while fetching college information" });
+  }
 });
+
+app.get("/collegeInfo/:id/review", async (req, res) => {
+  try {
+    const collegeId = req.params.id;
+    const college = await collegesCollection.findOne({ _id: new ObjectId(collegeId) });
+
+    if (!college) {
+      return res.status(404).send({ message: "College not found" });
+    }
+
+    res.json(college.reviews);
+  } catch (error) {
+    console.error("Error fetching college reviews:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/myCollege", async (req, res) =>{
+  const myCollege = await myCollegeSelection.find({ email: req.query.email }).toArray()
+  res.send(myCollege)
+})
+
+app.post("/myCollege", async (req, res) =>{
+const data = req.body
+const result = await myCollegeSelection.insertOne(data)
+res.send(result)
+})
 
 app.get("/users", async (req, res) => {
   const result = await usersCollection.find().toArray();
@@ -65,7 +99,7 @@ app.post("/users", async (req, res) => {
   const query = { email: user.email };
   const existingUser = await usersCollection.findOne(query);
   if (existingUser) {
-    return res.send({ message: "user already exists" });
+    return res.send({ message: "User already exists" });
   }
   const result = await usersCollection.insertOne(user);
   res.send(result);
